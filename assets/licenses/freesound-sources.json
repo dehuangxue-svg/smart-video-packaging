@@ -1,0 +1,46 @@
+{
+  "license": "Creative Commons Zero (CC0)",
+  "note": "Bundled WAV effects are edited versions of these CC0 recordings. See the source pages for attribution and license.",
+  "sources": [
+    {
+      "id": 170229,
+      "title": "Camera Shutter",
+      "author": "roachpowder",
+      "page": "https://freesound.org/people/roachpowder/sounds/170229/",
+      "preview": "https://cdn.freesound.org/previews/170/170229_3133582-lq.mp3",
+      "used_for": "camera"
+    },
+    {
+      "id": 794903,
+      "title": "Cash Register (imitation with toaster and bells)",
+      "author": "modusmogulus",
+      "page": "https://freesound.org/people/modusmogulus/sounds/794903/",
+      "preview": "https://cdn.freesound.org/previews/794/794903_15956618-lq.mp3",
+      "used_for": "cash"
+    },
+    {
+      "id": 462362,
+      "title": "Small applause",
+      "author": "Breviceps",
+      "page": "https://freesound.org/people/Breviceps/sounds/462362/",
+      "preview": "https://cdn.freesound.org/previews/462/462362_9159316-lq.mp3",
+      "used_for": "clap"
+    },
+    {
+      "id": 670465,
+      "title": "Heartbeat",
+      "author": "JonasTisell",
+      "page": "https://freesound.org/people/JonasTisell/sounds/670465/",
+      "preview": "https://cdn.freesound.org/previews/670/670465_3910073-lq.mp3",
+      "used_for": "heartbeat"
+    },
+    {
+      "id": 161122,
+      "title": "Cartoon Boing.wav",
+      "author": "reelworldstudio",
+      "page": "https://freesound.org/people/reelworldstudio/sounds/161122/",
+      "preview": "https://cdn.freesound.org/previews/161/161122_2750714-lq.mp3",
+      "used_for": "bounce"
+    }
+  ]
+}
