@@ -1,0 +1,8 @@
+fastapi==0.135.3
+uvicorn==0.44.0
+pydantic>=2.10,<3
+numpy>=2.0,<3
+opencv-python-headless>=4.10,<5
+sherpa-onnx>=1.12,<2
+pypinyin>=0.55,<1
+faster-whisper==1.2.1

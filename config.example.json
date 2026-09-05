@@ -1,0 +1,20 @@
+{
+  "projects_dir": "data/projects",
+  "jobs_dir": "data/jobs",
+  "training_dir": "data/training",
+  "temp_dir": "data/temp",
+  "cache_dir": "data/cache",
+  "exports_dir": "outputs",
+  "recent_videos_dir": "videos",
+  "highlight_library": "assets/highlights",
+  "sensevoice_model": "models/sensevoice/model.int8.onnx",
+  "sensevoice_tokens": "models/sensevoice/tokens.txt",
+  "silero_vad": "models/vad/silero_vad.onnx",
+  "faster_whisper_model": "models/faster-whisper-base",
+  "punctuation_model": "models/punctuation/model.int8.onnx",
+  "face_model": "models/vision/face_detection_yunet_2023mar.onnx",
+  "qwen_model": "models/qwen/Qwen3.5-0.8B-Q4_K_M.gguf",
+  "llama_cli": "runtime/llama/llama-cli.exe",
+  "threads": 2,
+  "visual_interval": 2.0
+}
