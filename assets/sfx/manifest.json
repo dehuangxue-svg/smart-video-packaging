@@ -1,0 +1,242 @@
+{
+  "library_version": "cc0-curated-v2",
+  "license": "Creative Commons Zero (CC0)",
+  "sources": [
+    "Kenney",
+    "Freesound"
+  ],
+  "effects": [
+    {
+      "id": "pop",
+      "label": "轻弹",
+      "group": "强调",
+      "duration": 0.16,
+      "source": "interface-sounds/Audio/pluck_002.ogg",
+      "output": "pop.wav"
+    },
+    {
+      "id": "shine",
+      "label": "闪光",
+      "group": "重点",
+      "duration": 0.28,
+      "source": "interface-sounds/Audio/glass_001.ogg",
+      "output": "shine.wav"
+    },
+    {
+      "id": "whoosh",
+      "label": "轻转场",
+      "group": "转场",
+      "duration": 0.42,
+      "source": "digital-audio/Audio/phaserUp2.ogg",
+      "output": "whoosh.wav"
+    },
+    {
+      "id": "click",
+      "label": "点击",
+      "group": "节奏",
+      "duration": 0.1,
+      "source": "interface-sounds/Audio/click_001.ogg",
+      "output": "click.wav"
+    },
+    {
+      "id": "tap",
+      "label": "轻敲",
+      "group": "节奏",
+      "duration": 0.14,
+      "source": "impact-sounds/Audio/impactGeneric_light_003.ogg",
+      "output": "tap.wav"
+    },
+    {
+      "id": "bell",
+      "label": "提示铃",
+      "group": "提示",
+      "duration": 0.7,
+      "source": "impact-sounds/Audio/impactBell_heavy_002.ogg",
+      "output": "bell.wav"
+    },
+    {
+      "id": "chime",
+      "label": "清脆和弦",
+      "group": "重点",
+      "duration": 0.54,
+      "source": "interface-sounds/Audio/confirmation_002.ogg",
+      "output": "chime.wav"
+    },
+    {
+      "id": "coin",
+      "label": "金币",
+      "group": "价格",
+      "duration": 0.23,
+      "source": "casino-audio/Audio/chips-collide-2.ogg",
+      "output": "coin.wav"
+    },
+    {
+      "id": "success",
+      "label": "完成提示",
+      "group": "提示",
+      "duration": 0.83,
+      "source": "digital-audio/Audio/threeTone1.ogg",
+      "output": "success.wav"
+    },
+    {
+      "id": "bounce",
+      "label": "弹跳",
+      "group": "活泼",
+      "duration": 0.5,
+      "source": "freesound-cc0/boing_161122_clip.wav",
+      "output": "bounce.wav"
+    },
+    {
+      "id": "snap",
+      "label": "脆响",
+      "group": "强调",
+      "duration": 0.38,
+      "source": "interface-sounds/Audio/select_003.ogg",
+      "output": "snap.wav"
+    },
+    {
+      "id": "impact",
+      "label": "低频强调",
+      "group": "重点",
+      "duration": 0.54,
+      "source": "impact-sounds/Audio/impactPunch_medium_002.ogg",
+      "output": "impact.wav"
+    },
+    {
+      "id": "ding",
+      "label": "清脆叮",
+      "group": "提示",
+      "duration": 0.29,
+      "source": "interface-sounds/Audio/confirmation_001.ogg",
+      "output": "ding.wav"
+    },
+    {
+      "id": "water_drop",
+      "label": "水滴",
+      "group": "自然",
+      "duration": 0.19,
+      "source": "interface-sounds/Audio/drop_003.ogg",
+      "output": "water_drop.wav"
+    },
+    {
+      "id": "bubble",
+      "label": "气泡",
+      "group": "活泼",
+      "duration": 0.1,
+      "source": "interface-sounds/Audio/pluck_001.ogg",
+      "output": "bubble.wav"
+    },
+    {
+      "id": "swipe",
+      "label": "滑动",
+      "group": "转场",
+      "duration": 0.6,
+      "source": "casino-audio/Audio/card-slide-3.ogg",
+      "output": "swipe.wav"
+    },
+    {
+      "id": "whoosh_fast",
+      "label": "快速呼啸",
+      "group": "转场",
+      "duration": 0.31,
+      "source": "digital-audio/Audio/phaserUp5.ogg",
+      "output": "whoosh_fast.wav"
+    },
+    {
+      "id": "whoosh_soft",
+      "label": "柔和呼啸",
+      "group": "转场",
+      "duration": 0.5,
+      "source": "digital-audio/Audio/phaserDown3.ogg",
+      "output": "whoosh_soft.wav"
+    },
+    {
+      "id": "riser",
+      "label": "上升揭晓",
+      "group": "氛围",
+      "duration": 1.15,
+      "source": "digital-audio/Audio/powerUp3.ogg",
+      "output": "riser.wav"
+    },
+    {
+      "id": "magic",
+      "label": "魔法闪现",
+      "group": "氛围",
+      "duration": 0.63,
+      "source": "digital-audio/Audio/pepSound4.ogg",
+      "output": "magic.wav"
+    },
+    {
+      "id": "camera",
+      "label": "相机快门",
+      "group": "生活",
+      "duration": 0.3,
+      "source": "freesound-cc0/camera_170229_clip.wav",
+      "output": "camera.wav"
+    },
+    {
+      "id": "typing",
+      "label": "键盘输入",
+      "group": "生活",
+      "duration": 1.0,
+      "source": "interface-sounds/Audio/scroll_004.ogg",
+      "output": "typing.wav"
+    },
+    {
+      "id": "cash",
+      "label": "收银提示",
+      "group": "价格",
+      "duration": 1.41,
+      "source": "freesound-cc0/cash_794903_clip.wav",
+      "output": "cash.wav"
+    },
+    {
+      "id": "drum",
+      "label": "鼓点",
+      "group": "节奏",
+      "duration": 0.57,
+      "source": "impact-sounds/Audio/impactSoft_heavy_002.ogg",
+      "output": "drum.wav"
+    },
+    {
+      "id": "boom",
+      "label": "爆炸冲击",
+      "group": "强调",
+      "duration": 0.54,
+      "source": "impact-sounds/Audio/impactPunch_heavy_001.ogg",
+      "output": "boom.wav"
+    },
+    {
+      "id": "error",
+      "label": "错误提示",
+      "group": "提示",
+      "duration": 0.53,
+      "source": "interface-sounds/Audio/error_003.ogg",
+      "output": "error.wav"
+    },
+    {
+      "id": "heartbeat",
+      "label": "心跳",
+      "group": "氛围",
+      "duration": 0.46,
+      "source": "freesound-cc0/heartbeat_670465_clip.wav",
+      "output": "heartbeat.wav"
+    },
+    {
+      "id": "clap",
+      "label": "掌声",
+      "group": "综艺",
+      "duration": 1.2,
+      "source": "freesound-cc0/applause_462362_clip.wav",
+      "output": "clap.wav"
+    },
+    {
+      "id": "surprise",
+      "label": "惊讶提示",
+      "group": "综艺",
+      "duration": 0.44,
+      "source": "digital-audio/Audio/pepSound3.ogg",
+      "output": "surprise.wav"
+    }
+  ]
+}
