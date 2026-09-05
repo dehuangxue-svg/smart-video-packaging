@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="410" viewBox="0 0 1440 410" role="img" aria-labelledby="title desc">
+  <title id="title">Local video finishing — 剪辑智能包装</title>
+  <desc id="desc">Workflow illustration: local video, speech recognition, editable captions and sound effects, video export. All processing runs locally after setup.</desc>
+  <rect width="1440" height="410" rx="22" fill="#11151c"/>
+  <g font-family="Segoe UI, Microsoft YaHei, sans-serif">
+    <rect x="42" y="38" width="7" height="44" rx="3" fill="#30d4c0"/>
+    <text x="68" y="57" font-size="15" letter-spacing="3" fill="#30d4c0">LOCAL VIDEO FINISHING</text>
+    <text x="67" y="89" font-size="23" font-weight="600" fill="#f0f4f7">剪辑智能包装 · Smart Video Packaging</text>
+    <text x="1398" y="63" text-anchor="end" font-size="14" fill="#adb7c6">Windows · CPU · 中文 / English</text>
+    <g fill="#1e2632" stroke="#303c4d">
+      <rect x="43" y="123" width="280" height="79" rx="12"/>
+      <rect x="399" y="123" width="280" height="79" rx="12"/>
+      <rect x="756" y="123" width="280" height="79" rx="12"/>
+      <rect x="1112" y="123" width="285" height="79" rx="12"/>
+    </g>
+    <g fill="#eef4f8" font-size="20" font-weight="600" text-anchor="middle">
+      <text x="183" y="157">载入视频 / Import</text><text x="539" y="157">本地识别 / Local ASR</text>
+      <text x="896" y="157">人工精修 / Refine</text><text x="1254" y="157">导出成片 / Export</text>
+    </g>
+    <g fill="#9dacbf" font-size="13" text-anchor="middle">
+      <text x="183" y="182">Original audio + basic cuts</text><text x="539" y="182">Captions · highlights · effect cues</text>
+      <text x="896" y="182">Editable text, timing and volume</text><text x="1254" y="182">H.264 video + AAC audio</text>
+    </g>
+    <g fill="#30d4c0" font-size="26" text-anchor="middle"><text x="360" y="170">→</text><text x="716" y="170">→</text><text x="1074" y="170">→</text></g>
+    <g font-size="13" fill="#9dacbf"><text x="43" y="259">V1 · Video</text><text x="43" y="302">T1 · Captions</text><text x="43" y="345">A1 · Effects</text></g>
+    <g fill="#29505c"><rect x="158" y="237" width="380" height="30" rx="5"/><rect x="547" y="237" width="450" height="30" rx="5"/><rect x="1006" y="237" width="391" height="30" rx="5"/></g>
+    <g fill="#317e73"><rect x="182" y="280" width="210" height="30" rx="5"/><rect x="425" y="280" width="302" height="30" rx="5"/><rect x="771" y="280" width="214" height="30" rx="5"/><rect x="1051" y="280" width="279" height="30" rx="5"/></g>
+    <g fill="#ad8539"><rect x="202" y="323" width="41" height="30" rx="5"/><rect x="466" y="323" width="63" height="30" rx="5"/><rect x="794" y="323" width="47" height="30" rx="5"/><rect x="1080" y="323" width="68" height="30" rx="5"/><rect x="1300" y="323" width="42" height="30" rx="5"/></g>
+    <path d="M738 228v134" stroke="#fb8276" stroke-width="2"/><path d="M732 225h12l-6 8z" fill="#fb8276"/>
+    <text x="1397" y="390" text-anchor="end" fill="#7e8ba0" font-size="12">Workflow illustration · 工作流示意</text>
+  </g>
+</svg>
