@@ -6,6 +6,8 @@
 /videos/
 /outputs/
 /assets/highlights/
+/assets/sfx_sources/
+/assets/sfx_synthetic_backup_v1/
 .env
 .env.*
 *.pem

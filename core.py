@@ -15,18 +15,8 @@ CONFIG_FILE = ROOT / "config.json"
 
 
 def load_config() -> dict[str, Any]:
-    data = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8-sig"))
-    if CONFIG_FILE.is_file():
-        data.update(json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig")))
-    path_keys = ("projects_dir", "jobs_dir", "training_dir", "temp_dir", "cache_dir",
-                 "exports_dir", "recent_videos_dir", "highlight_library", "sensevoice_model",
-                 "sensevoice_tokens", "silero_vad", "faster_whisper_model", "punctuation_model",
-                 "face_model", "qwen_model", "llama_cli")
-    for key in path_keys:
-        if data.get(key):
-            path = Path(data[key]).expanduser()
-            data[key] = str(path if path.is_absolute() else (ROOT / path).resolve())
-    for key in ("projects_dir", "jobs_dir", "training_dir", "temp_dir", "cache_dir", "exports_dir", "recent_videos_dir"):
+    data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    for key in ("projects_dir", "jobs_dir", "training_dir", "temp_dir", "exports_dir"):
         Path(data[key]).mkdir(parents=True, exist_ok=True)
     return data
 
@@ -351,7 +341,7 @@ def highlight_ass_text(text: str, words: list[str], normal: str, accent: str) ->
 
 def write_ass(project: dict[str, Any], path: Path, width: int, height: int) -> None:
     settings = project.get("settings", {})
-    font = str(settings.get("font", "Microsoft YaHei UI"))
+    font = str(settings.get("font", "华文琥珀"))
     size = int(settings.get("font_size", 54))
     margin = int(settings.get("margin_v", 180))
     normal = ass_color(str(settings.get("text_color", "#FFFFFF")))
@@ -412,7 +402,7 @@ def validate_project(project: dict[str, Any], media: dict[str, Any]) -> list[dic
     asr_quality = project.get("asr_quality", {}) or project.get("model_output", {}).get("asr", {}).get("quality", {})
     if asr_quality:
         uncovered = float(asr_quality.get("uncovered_speech_seconds", 0) or 0)
-        if asr_quality.get("timestamp_mode") != "token":
+        if asr_quality.get("timestamp_mode") not in ("token", "word", "paraformer_char", "fa_zh_vad_corrected", "fa_zh_anchor_corrected"):
             issues.append({"level": "warning", "message": "当前字幕不是逐字时间戳，请重新识别以避免时间轴漂移"})
         if asr_quality.get("status") == "needs_review" or uncovered > 0.45:
             issues.append({"level": "warning", "message": f"语音覆盖质检发现 {uncovered:.2f} 秒需要回听"})

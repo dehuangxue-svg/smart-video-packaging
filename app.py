@@ -16,9 +16,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from editing import normalize_clips, edit_duration, edit_key, prepare_edited_video
+from review_queue import ReviewQueue, QueueConflict, atomic_json, revision
 
 from core import (
     ROOT, load_config, probe_video, product_name_from_filename, project_id,
@@ -38,10 +39,17 @@ PYTHON = WORKER_PYTHON if WORKER_PYTHON.is_file() else Path(sys.executable)
 JOBS: dict[str, dict[str, Any]] = {}
 JOBS_LOCK = threading.Lock()
 MODEL_LOCK = threading.Lock()
-PIPELINE_VERSION = "multilingual-word-timestamps-v2"
+EXPORT_LOCK = threading.Lock()
+REVIEW = ReviewQueue(PROJECTS)
+PIPELINE_VERSION = "multilingual-word-timestamps-v4-paraformer-fa-zh-alignment"
 AsrLanguage = Literal["auto", "zh", "en", "yue", "ja", "ko"]
 
-app = FastAPI(title="剪辑智能包装", version="0.1.0")
+app = FastAPI(title="剪辑智能包装", version="0.2.0")
+
+
+@app.exception_handler(QueueConflict)
+async def queue_conflict_handler(request, exc):
+    return JSONResponse(status_code=409, content={'detail': str(exc)})
 
 
 class VideoRequest(BaseModel):
@@ -58,6 +66,7 @@ class BatchRequest(BaseModel):
 
 class ProjectRequest(BaseModel):
     video: str
+    revision: str | None = None
     video_clips: list[dict[str, Any]] | None = None
     product_name: str = ""
     subtitles: list[dict[str, Any]] = Field(default_factory=list)
@@ -69,12 +78,24 @@ class ProjectRequest(BaseModel):
     model_output: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReviewSelection(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+    language: AsrLanguage = 'auto'
+    reprocess: bool = False
+
+
+class ReviewApproval(BaseModel):
+    id: str
+    revision: str
+    reviewed: bool = True
+
+
 def project_path(video: Path) -> Path:
     return PROJECTS / f"{project_id(video)}.json"
 
 
 def ensure_video(path: str) -> Path:
-    video = Path(path)
+    video = Path(path).expanduser().resolve()
     if not video.is_file():
         raise HTTPException(404, f"视频不存在：{video}")
     return video
@@ -88,6 +109,10 @@ def dependency_status() -> dict[str, Any]:
         "tokens": CONFIG["sensevoice_tokens"],
         "vad": CONFIG["silero_vad"],
         "fallback_asr": CONFIG.get("faster_whisper_model", ""),
+        "paraformer": CONFIG.get("paraformer_model", ""),
+        "paraformer_vad": CONFIG.get("paraformer_vad_model", ""),
+        "paraformer_punc": CONFIG.get("paraformer_punc_model", ""),
+        "paraformer_align": CONFIG.get("paraformer_align_model", ""),
         "punctuation": CONFIG["punctuation_model"],
         "face": CONFIG["face_model"],
         "qwen": CONFIG["qwen_model"],
@@ -99,7 +124,7 @@ def dependency_status() -> dict[str, Any]:
 def installed_font_families() -> list[str]:
     """Return Windows font families for the editor without loading font files."""
     preferred = [
-        "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "MiSans",
+        "华文琥珀", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "MiSans",
         "HarmonyOS Sans SC", "SimHei", "DengXian", "KaiTi", "FangSong",
         "方正姚体", "方正舒体", "幼圆", "华文行楷", "Arial",
     ]
@@ -183,9 +208,10 @@ def execute_cached_worker(
 
 def run_auto_job(job_id: str, video: Path, language: str = "auto", video_clips=None) -> None:
     job_dir = JOBS_DIR / job_id
-    job_dir.mkdir(parents=True, exist_ok=True)
-    cache_dir = video_cache_dir(video, language)
     try:
+        job_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir = video_cache_dir(video, language)
+        REVIEW.processing(video, 'processing')
         with MODEL_LOCK:
             clips = normalize_clips(video_clips, float(probe_video(video)["duration"]))
             if not clips:
@@ -198,16 +224,44 @@ def run_auto_job(job_id: str, video: Path, language: str = "auto", video_clips=N
             missing_asr = [key for key in ("sensevoice", "tokens", "vad", "punctuation") if not status[key]["ready"]]
             if missing_asr:
                 raise RuntimeError("缺少轻量ASR模型，请先双击“下载轻量模型.bat”：" + "、".join(missing_asr))
-            asr_out = job_dir / "asr.json"
-            asr = execute_cached_worker(job_id, "正在用SenseVoice识别字幕", [
-                str(PYTHON), str(ROOT / "workers" / "asr_worker.py"),
-                "--video", str(prepared), "--output", str(asr_out),
-                "--model", CONFIG["sensevoice_model"], "--tokens", CONFIG["sensevoice_tokens"],
-                "--vad", CONFIG["silero_vad"], "--threads", str(CONFIG.get("threads", 2)),
-                "--punctuation", CONFIG["punctuation_model"],
-                "--fallback-model", CONFIG.get("faster_whisper_model", ""),
-                "--language", language,
-            ], asr_out, 15, cache_dir / "asr.json")
+            paraformer_ready = language in ("auto", "zh") and all(
+                Path(CONFIG.get(key, "")).is_dir()
+                for key in ("paraformer_model", "paraformer_vad_model", "paraformer_punc_model")
+            )
+            if paraformer_ready:
+                asr_out = job_dir / "asr_paraformer.json"
+                try:
+                    asr = execute_cached_worker(job_id, "正在用Paraformer-zh识别字幕", [
+                        str(PYTHON), str(ROOT / "workers" / "paraformer_worker.py"),
+                        "--video", str(prepared), "--output", str(asr_out),
+                        "--model", CONFIG["paraformer_model"],
+                        "--vad", CONFIG["paraformer_vad_model"],
+                        "--punc", CONFIG["paraformer_punc_model"],
+                        "--align-model", CONFIG.get("paraformer_align_model", ""),
+                        "--threads", str(CONFIG.get("threads", 2)),
+                    ], asr_out, 15, cache_dir / "asr_paraformer.json")
+                except Exception:
+                    asr_out = job_dir / "asr.json"
+                    asr = execute_cached_worker(job_id, "Paraformer失败，回退SenseVoice识别字幕", [
+                        str(PYTHON), str(ROOT / "workers" / "asr_worker.py"),
+                        "--video", str(prepared), "--output", str(asr_out),
+                        "--model", CONFIG["sensevoice_model"], "--tokens", CONFIG["sensevoice_tokens"],
+                        "--vad", CONFIG["silero_vad"], "--threads", str(CONFIG.get("threads", 2)),
+                        "--punctuation", CONFIG["punctuation_model"],
+                        "--fallback-model", CONFIG.get("faster_whisper_model", ""),
+                        "--align-all", "--language", language,
+                    ], asr_out, 15, cache_dir / "asr.json")
+            else:
+                asr_out = job_dir / "asr.json"
+                asr = execute_cached_worker(job_id, "正在用SenseVoice识别字幕", [
+                    str(PYTHON), str(ROOT / "workers" / "asr_worker.py"),
+                    "--video", str(prepared), "--output", str(asr_out),
+                    "--model", CONFIG["sensevoice_model"], "--tokens", CONFIG["sensevoice_tokens"],
+                    "--vad", CONFIG["silero_vad"], "--threads", str(CONFIG.get("threads", 2)),
+                    "--punctuation", CONFIG["punctuation_model"],
+                    "--fallback-model", CONFIG.get("faster_whisper_model", ""),
+                    "--align-all", "--language", language,
+                ], asr_out, 15, cache_dir / "asr.json")
 
             analysis_in = job_dir / "analysis_input.json"
             analysis_out = job_dir / "analysis.json"
@@ -246,7 +300,7 @@ def run_auto_job(job_id: str, video: Path, language: str = "auto", video_clips=N
             "sound_markers": sound_markers, "visual": visual,
             "asr_quality": asr.get("quality", {}),
             "settings": {
-                "font": "Microsoft YaHei UI", "font_size": 54, "margin_v": 180,
+                "font": "华文琥珀", "font_size": 54, "margin_v": 180,
                 "text_color": "#FFFFFF", "highlight_color": "#FFD43B",
                 "outline_color": "#101010", "hook_end": round(hook_end, 2), "sfx_volume": 0.50,
                 "subtitle_x": 50, "subtitle_y": 90,
@@ -255,7 +309,11 @@ def run_auto_job(job_id: str, video: Path, language: str = "auto", video_clips=N
             },
             "model_output": {"asr": asr, "analysis": analysis, "visual": visual, "video_clips": clips},
         }
-        write_json(project_path(video), project)
+        project['revision'] = REVIEW.save(project, analysis=True)
+        # Keep an immutable model-output snapshot for local training from the
+        # first automatic analysis; later human saves create additional
+        # before/after snapshots through the normal save endpoint.
+        save_training_snapshot(project)
         quality = asr.get("quality", {})
         needs_review = quality.get("status") == "needs_review"
         update_job(
@@ -264,6 +322,7 @@ def run_auto_job(job_id: str, video: Path, language: str = "auto", video_clips=N
             progress=100, quality_status="needs_review" if needs_review else "ok", result=project,
         )
     except Exception as exc:
+        REVIEW.processing(video, 'error', str(exc))
         update_job(job_id, status="error", stage="失败", message=str(exc), progress=100)
 
 
@@ -559,7 +618,7 @@ def desktop_health() -> dict[str, Any]:
     with JOBS_LOCK:
         active = sum(job.get("status") == "running" for job in JOBS.values())
     return {"application": "smart-video-packaging", "protocol": 1,
-            "root": str(ROOT.resolve()), "active_jobs": active}
+            "root": str(ROOT.resolve()), "active_jobs": active, 'version': '0.2.0'}
 
 
 @app.get("/desktop.js")
@@ -580,6 +639,16 @@ def edit_core_script():
 @app.get("/editor.js")
 def editor_script():
     return FileResponse(ROOT / "static" / "editor.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get('/review.js')
+def review_script():
+    return FileResponse(ROOT / 'static' / 'review.js', media_type='application/javascript', headers={'Cache-Control': 'no-cache'})
+
+
+@app.get('/review.css')
+def review_styles():
+    return FileResponse(ROOT / 'static' / 'review.css', media_type='text/css', headers={'Cache-Control': 'no-cache'})
 
 
 @app.get("/api/config")
@@ -708,7 +777,10 @@ def pick_folder(ui_language: Literal["zh", "en"] = "zh") -> dict[str, str]:
 @app.post("/api/load")
 def load_video(req: VideoRequest) -> dict[str, Any]:
     video = ensure_video(req.video)
+    REVIEW.add([video])
     saved = read_json(project_path(video))
+    if saved:
+        saved['revision'] = revision(saved)
     media = probe_video(video)
     return {
         "video": str(video), "media": media, "product_name": product_name_from_filename(video),
@@ -725,6 +797,9 @@ def video_file(path: str):
 @app.post("/api/start-auto")
 def start_auto(req: VideoRequest) -> dict[str, str]:
     video = ensure_video(req.video)
+    identities = REVIEW.add([video])
+    if not REVIEW.claim_analysis(identities, force=True):
+        raise QueueConflict('此视频已有进行中的任务')
     job_id = uuid.uuid4().hex
     job = {"id": job_id, "kind": "auto", "video": str(video), "status": "running", "stage": "排队", "message": "等待开始", "progress": 0, "created_at": time.time()}
     with JOBS_LOCK:
@@ -736,6 +811,18 @@ def start_auto(req: VideoRequest) -> dict[str, str]:
 
 @app.post("/api/start-batch")
 def start_batch(req: BatchRequest) -> dict[str, Any]:
+    imported = import_review_folder(req)
+    result = start_review_analysis(ReviewSelection(ids=imported['ids'], language=req.language))
+    return {**result, 'folder': req.folder}
+
+
+@app.get('/api/review')
+def review_listing():
+    return {'items': REVIEW.listing(), 'batches': REVIEW.batch_listing(), 'exports_dir': str(EXPORTS)}
+
+
+@app.post('/api/review/import')
+def import_review_folder(req: BatchRequest):
     folder = Path(req.folder)
     if not folder.is_dir():
         raise HTTPException(404, f"文件夹不存在：{folder}")
@@ -744,9 +831,26 @@ def start_batch(req: BatchRequest) -> dict[str, Any]:
     videos = sorted((path for path in iterator if path.is_file() and path.suffix.lower() in extensions), key=lambda path: path.name.casefold())
     if not videos:
         raise HTTPException(400, "所选文件夹中没有可处理的视频")
+    batch_id, identities = REVIEW.add_batch(videos, folder)
+    return {'ids': identities, 'count': len(identities), 'batch_id': batch_id, 'items': REVIEW.listing()}
+
+
+def check_review_ids(identities):
+    available = {item['id'] for item in REVIEW.listing()}
+    if any(identity not in available for identity in identities):
+        raise HTTPException(404, '待审阅项目不存在，请刷新列表')
+
+
+@app.post('/api/review/analyze')
+def start_review_analysis(req: ReviewSelection):
+    check_review_ids(req.ids)
+    claimed = REVIEW.claim_analysis(req.ids, force=req.reprocess)
+    videos = [Path(item['video']) for item in claimed]
+    if not videos:
+        return {'job_id': None, 'count': 0}
     job_id = uuid.uuid4().hex
     job = {
-        "id": job_id, "kind": "batch", "folder": str(folder), "video_count": len(videos),
+        "id": job_id, "kind": "batch", "video_count": len(videos),
         "status": "running", "stage": "排队", "message": f"等待处理{len(videos)}个视频",
         "progress": 0, "created_at": time.time(),
     }
@@ -754,7 +858,63 @@ def start_batch(req: BatchRequest) -> dict[str, Any]:
         JOBS[job_id] = job
         write_json(JOBS_DIR / f"{job_id}.json", job)
     threading.Thread(target=run_batch_job, args=(job_id, videos, req.language), daemon=True).start()
-    return {"job_id": job_id, "count": len(videos), "folder": str(folder)}
+    return {"job_id": job_id, "count": len(videos)}
+
+
+@app.post('/api/review/approve')
+def approve_review(req: ReviewApproval):
+    check_review_ids([req.id])
+    return REVIEW.approve(req.id, req.revision, req.reviewed)
+
+
+@app.post('/api/review/remove')
+def remove_review(req: ReviewSelection):
+    check_review_ids(req.ids)
+    REVIEW.remove(req.ids)
+    return {'items': REVIEW.listing()}
+
+
+def run_export_job(job_id, snapshots):
+    results = []
+    with EXPORT_LOCK:
+        for position, snapshot in enumerate(snapshots, 1):
+            identity = snapshot['id']
+            project = snapshot.get('project') or read_json(Path(snapshot['snapshot_path']))
+            REVIEW.export_update(identity, 'exporting')
+            update_job(job_id, message=f"正在导出 {position}/{len(snapshots)}：{Path(project['video']).name if project else identity}",
+                       progress=int((position - 1) / len(snapshots) * 100))
+            try:
+                if not project:
+                    raise ValueError('导出快照不存在，请重新加入导出队列')
+                with MODEL_LOCK:
+                    rendered = render_project(ProjectRequest(**project))
+                REVIEW.export_update(identity, 'done', exported_revision=snapshot['revision'], output=rendered['output'])
+                results.append({'id': identity, 'status': 'done', **rendered})
+            except Exception as exc:
+                message = str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
+                REVIEW.export_update(identity, 'error', error=message)
+                results.append({'id': identity, 'status': 'error', 'message': message})
+            finally:
+                if snapshot.get('snapshot_path'):
+                    Path(snapshot['snapshot_path']).unlink(missing_ok=True)
+            update_job(job_id, result={'items': results}, progress=int(position / len(snapshots) * 100))
+    completed = sum(item['status'] == 'done' for item in results)
+    update_job(job_id, status='done', progress=100,
+               message=f'导出完成：成功 {completed}，失败 {len(results) - completed}',
+               result={'items': results, 'completed': completed, 'failed': len(results) - completed})
+
+
+@app.post('/api/review/export')
+def start_review_export(req: ReviewSelection):
+    check_review_ids(req.ids)
+    job_id = uuid.uuid4().hex
+    snapshots = REVIEW.claim_exports(req.ids, JOBS_DIR / job_id / 'snapshots')
+    with JOBS_LOCK:
+        JOBS[job_id] = {'id': job_id, 'kind': 'export', 'status': 'running', 'progress': 0,
+                        'message': '等待顺序导出', 'created_at': time.time(), 'count': len(snapshots)}
+        atomic_json(JOBS_DIR / (job_id + '.json'), JOBS[job_id])
+    threading.Thread(target=run_export_job, args=(job_id, snapshots), daemon=True).start()
+    return {'job_id': job_id, 'count': len(snapshots)}
 
 
 @app.get("/api/job/{job_id}")
@@ -763,6 +923,8 @@ def get_job(job_id: str) -> dict[str, Any]:
         job = copy.deepcopy(JOBS.get(job_id))
     if job is None:
         job = read_json(JOBS_DIR / f"{job_id}.json")
+        if job and job.get('status') == 'running':
+            job.update(status='error', message='任务被中断，请重新运行')
     if not job:
         raise HTTPException(404, "任务不存在")
     return job
@@ -779,9 +941,10 @@ def save_project(req: ProjectRequest) -> dict[str, str]:
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(400, str(exc))
     path = project_path(video)
-    write_json(path, data)
-    snapshot = save_training_snapshot(data)
-    return {"project": str(path), "training_snapshot": str(snapshot)}
+    previous = read_json(path)
+    current_revision = REVIEW.save(data, expected_revision=req.revision)
+    snapshot = save_training_snapshot(data) if not previous or revision(previous) != current_revision else ''
+    return {"project": str(path), "training_snapshot": str(snapshot), 'revision': current_revision}
 
 
 @app.post("/api/validate")
@@ -825,6 +988,23 @@ def highlights(product: str) -> dict[str, Any]:
 
 @app.post("/api/render")
 def render(req: ProjectRequest) -> dict[str, Any]:
+    saved = save_project(req)
+    identity = project_id(Path(req.video))
+    REVIEW.approve(identity, saved['revision'])
+    snapshots = REVIEW.claim_exports([identity])
+    snapshot = snapshots[0]
+    try:
+        with EXPORT_LOCK, MODEL_LOCK:
+            REVIEW.export_update(identity, 'exporting')
+            result = render_project(ProjectRequest(**snapshot['project']))
+        REVIEW.export_update(identity, 'done', exported_revision=snapshot['revision'], output=result['output'])
+        return result
+    except Exception as exc:
+        REVIEW.export_update(identity, 'error', error=str(exc))
+        raise
+
+
+def render_project(req: ProjectRequest) -> dict[str, Any]:
     video = ensure_video(req.video)
     project = req.model_dump()
     media = probe_video(video)
@@ -839,12 +1019,13 @@ def render(req: ProjectRequest) -> dict[str, Any]:
     blocking = [x for x in issues if x["level"] == "error"]
     if blocking:
         raise HTTPException(400, {"message": "存在未解决的硬规则问题", "issues": blocking})
-    save_project(req)
-    work = TEMP / project_id(video)
+    work = TEMP / 'exports' / uuid.uuid4().hex
     work.mkdir(parents=True, exist_ok=True)
     ass = work / "subtitle.ass"
     write_ass(project, ass, int(media.get("width") or 1080), int(media.get("height") or 1920))
-    output = EXPORTS / f"{video.stem}_智能包装.mp4"
+    # Preserve earlier exports and distinguish equal names from different folders.
+    output = EXPORTS / f"{safe_stem(video)}_智能包装_{datetime.now():%Y%m%d_%H%M%S_%f}_{project_id(video)[-10:]}.mp4"
+    temporary_output = output.with_name(output.stem + '.partial.mp4')
     prepared = prepare_edited_video(video, clips, video_cache_dir(video) / ("export_" + edit_key(clips)), CONFIG.get("threads", 2))
     args = ["ffmpeg", "-y", "-v", "warning", "-i", str(prepared)]
     markers = [m for m in project.get("sound_markers", []) if m.get("enabled", True)]
@@ -859,11 +1040,16 @@ def render(req: ProjectRequest) -> dict[str, Any]:
         args += ["-vf", "ass=subtitle.ass"]
     args += [
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", str(CONFIG.get("threads", 2)),
-        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(output),
+        "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(temporary_output),
     ]
     try:
         run(args, cwd=work)
+        rendered_media = probe_video(temporary_output)
+        if not rendered_media.get('video_codec') or abs(rendered_media['duration'] - media['duration']) > max(1, media['duration'] * .01):
+            raise RuntimeError('导出校验失败：视频时长不完整')
+        os.replace(temporary_output, output)
     finally:
+        temporary_output.unlink(missing_ok=True)
         if markers:
             sound_track.unlink(missing_ok=True)
     return {"output": str(output), "issues": issues}

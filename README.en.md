@@ -104,6 +104,16 @@ Private data folders, models, runtime files, and `config.json` are excluded from
 - Native token timestamps, speech coverage checks, and retries reduce timing errors, but cannot guarantee perfect words or boundaries. Coverage is not transcription accuracy. Captions crossing cuts are marked for review.
 - Longer videos use batched text analysis, stage caches, and streamed sound mixing. The 30-minute effect target describes the scheduling rule, not comprehensive long-video or low-memory stress-test coverage.
 
+## Subtitle timestamp alignment
+
+Mandarin subtitle regeneration uses a three-stage pipeline:
+
+1. Paraformer-zh transcribes the complete audio and produces native character timestamps.
+2. FSMN-VAD splits the audio into speech-active regions with a small boundary pad.
+3. fa-zh force-aligns each short speech region independently, anchors the first character, and merges the corrected timestamps back into the full timeline.
+
+If coverage is too low or force alignment fails, the pipeline falls back to Paraformer native character timestamps and records `timestamp_mode`, coverage, uncovered duration, and the fallback reason in `asr_quality`. This avoids cumulative drift and tail loss from aligning a long recording as one segment.
+
 ## Development and licensing
 
 ```powershell
